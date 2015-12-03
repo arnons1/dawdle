@@ -16,10 +16,11 @@
 > import Control.Monad
 > import Data.Char
 > import Data.Int
+> import Data.List
 
 
 > type SParser a = forall s u (m :: * -> *). Stream s m Char => ParsecT s u m a
-> data CellType = Nullable CellType | 
+> data CellType = Nullable CellType |
 >   CTBool | CTInt8 | CTInt16 | CTInt32 | CTInt64 | CTChar Int | CTDate | CTDateTime | CTFloat | CTDouble | Unknown
 >   deriving (Eq,Show,Ord,Data,Typeable)
 > precedenceOrder =
@@ -34,11 +35,24 @@
 >   ,CTDateTime]
 >   -- If all else fails, chars!
 
-> analyzeCell :: String -> Either String CellType
-> analyzeCell s = rm s
+> analyzeFile mtrx = do
+>   let cols = transpose mtrx
+>   -- sanity on structure
+>   unless (allTheSame (map length cols)) $ Left "Some rows have a different number of columns"
+>   return $ map workOnAColumn cols
 
-> rm :: String -> Either String CellType
-> rm s
+> workOnAColumn :: [CellType] -> Either ErrMsg CellType
+> workOnAColumn [] = Left "Empty column, no cell types inferred"
+> workOnAColumn cts = do
+>   return $ foldl1 anlzr cts
+>   where
+>     anlzr :: CellType -> CellType -> Celltype
+
+> analyzeRow :: [String] -> Either String [CellType]
+> analyzeRow = map analyzeCell
+
+> analyzeCell :: String -> Either String CellType
+> analyzeCell s
 >  | null s = Right $ Nullable Unknown
 >  | isInt s = do
 >      s' <- maybeToEither ("Can't read integer as Integer (??)") (readMaybe s :: Maybe Integer)
@@ -68,7 +82,7 @@
 >   if (show x') /= (show x)
 >   then Right CTDouble
 >   else Right CTFloat
->   
+
 
 > csvFile :: SParser [[String]]
 > csvFile = endBy line eol
@@ -117,3 +131,6 @@
 > maybeToEither :: String -> Maybe a -> Either String a
 > maybeToEither _ (Just x) = Right x
 > maybeToEither s Nothing = Left s
+
+> allTheSame :: (Eq a) => [a] -> Bool
+> allTheSame xs = and $ map (== head xs) (tail xs)
