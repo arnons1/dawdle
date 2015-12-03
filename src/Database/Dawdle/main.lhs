@@ -14,33 +14,24 @@
 > import Data.Data
 > import Text.Read (readMaybe)
 > import Control.Monad
-> import Control.Monad.IO.Class
 > import Data.Char
 > import Data.Int
 > import Data.List
-
+> import Data.Time.Format
+> import Data.Time.Clock
+> import Text.Show.Pretty
+> import Text.PrettyPrint hiding (char)
 
 > type SParser a = forall s u (m :: * -> *). Stream s m Char => ParsecT s u m a
 > data CellType = Nullable CellType | Unknown | 
->   CTBool | CTInt8 | CTInt16 | CTInt32 | CTInt64 | CTFloat | CTDouble | CTDate | CTDateTime | CTChar Int
+>   CTBool | CTInt8 | CTInt16 | CTInt32 | CTInt64 | CTFloat | CTDouble | CTDate String | CTDateTime String | CTChar Int
 >   deriving (Eq,Show,Ord,Data,Typeable)
-> precedenceOrder =
->   [CTBool
->   ,CTInt8
->   ,CTInt16
->   ,CTInt32
->   ,CTInt64
->   ,CTFloat
->   ,CTDouble
->   ,CTDate
->   ,CTDateTime]
->   -- If all else fails, chars!
 
 > analyzeFile :: [[String]] -> Either String [CellType]
 > analyzeFile mtrx = do
 >   let cols = transpose mtrx
 >   -- sanity on structure
->   unless (allTheSame (map length cols)) $ Left "Some rows have a different number of columns"
+>   unless (allTheSame (map length cols)) $ Left $ "Invalid CSV: Some rows have a different number of columns."
 >   mapM workOnAColumn cols
 
 > workOnAColumn :: [String] -> Either String CellType
@@ -54,9 +45,11 @@
 >       let shouldBeNull = isNullable a || isNullable b
 >       in return $ applyNullIfNeeded shouldBeNull $ if b > a then b else a
 
+> isNullable :: CellType -> Bool
 > isNullable (Nullable _) = True
 > isNullable _ = False
 
+> applyNullIfNeeded :: Bool -> CellType -> CellType
 > applyNullIfNeeded True r@Nullable{} = r
 > applyNullIfNeeded True r = Nullable r
 > applyNullIfNeeded False r = r
@@ -69,6 +62,16 @@
 >  | null s = Right $ Nullable Unknown
 >  | b <- map toLower s
 >  , b `elem` ["false","true"] = Right $ CTBool
+>  | Just f <- msum $ map getFstIfJust
+>                   [(fmt, ptm fmt s) | fmt <- [iso8601DateFormat Nothing,"%Y%m%d"]] 
+>                 = Right $ CTDate f
+>  | Just f <- msum $ map getFstIfJust
+>                   [(fmt, ptm fmt s) | fmt <- [iso8601DateFormat $ Just "%H:%M:%S"
+>                                               ,"%Y-%m-%d %H:%M:%S.%Q"
+>                                               ,"%Y-%m-%d %H:%M:%S"
+>                                               ,rfc822DateFormat]]
+>                 = Right $ CTDateTime f
+>   
 >  | isInt s = do
 >      s' <- maybeToEither ("Can't read integer as Integer (??)") (readMaybe s :: Maybe Integer)
 >      intType s'
@@ -76,6 +79,13 @@
 >      s' <- maybeToEither ("Can't read float type as Double (??)") (readMaybe s :: Maybe Double)
 >      floatType s'
 >  | otherwise = Right $ CTChar (length s)
+
+> ptm :: String -> String -> Maybe UTCTime
+> ptm = parseTimeM True defaultTimeLocale
+
+> getFstIfJust :: (a, Maybe b) -> Maybe a
+> getFstIfJust (a,Just _) = Just a
+> getFstIfJust _ = Nothing
 
 > isCTNumber :: String -> Bool
 > isCTNumber = all (\x -> isNumber x || x `elem` ['-','.'])
@@ -135,7 +145,7 @@
 >           Left e -> do putStrLn "Error parsing input:"
 >                        print e
 >           Right r -> do
->             print (either (error . show) id $ analyzeFile r)
+>             putStrLn $ either error (render . ddl) $ analyzeFile r
 
 > sepChar :: Char
 > sepChar = ','
@@ -150,3 +160,6 @@
 
 > allTheSame :: (Eq a) => [a] -> Bool
 > allTheSame xs = and $ map (== head xs) (tail xs)
+
+> ddl :: [CellType] -> Doc
+> ddl cts = parens $ nest 3 $ vcat $ (map (text . show)) cts
