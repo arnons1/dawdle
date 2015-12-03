@@ -14,14 +14,15 @@
 > import Data.Data
 > import Text.Read (readMaybe)
 > import Control.Monad
+> import Control.Monad.IO.Class
 > import Data.Char
 > import Data.Int
 > import Data.List
 
 
 > type SParser a = forall s u (m :: * -> *). Stream s m Char => ParsecT s u m a
-> data CellType = Nullable CellType |
->   CTBool | CTInt8 | CTInt16 | CTInt32 | CTInt64 | CTChar Int | CTDate | CTDateTime | CTFloat | CTDouble | Unknown
+> data CellType = Nullable CellType | Unknown | 
+>   CTBool | CTInt8 | CTInt16 | CTInt32 | CTInt64 | CTFloat | CTDouble | CTDate | CTDateTime | CTChar Int
 >   deriving (Eq,Show,Ord,Data,Typeable)
 > precedenceOrder =
 >   [CTBool
@@ -35,25 +36,39 @@
 >   ,CTDateTime]
 >   -- If all else fails, chars!
 
+> analyzeFile :: [[String]] -> Either String [CellType]
 > analyzeFile mtrx = do
 >   let cols = transpose mtrx
 >   -- sanity on structure
 >   unless (allTheSame (map length cols)) $ Left "Some rows have a different number of columns"
->   return $ map workOnAColumn cols
+>   mapM workOnAColumn cols
 
-> workOnAColumn :: [CellType] -> Either ErrMsg CellType
+> workOnAColumn :: [String] -> Either String CellType
 > workOnAColumn [] = Left "Empty column, no cell types inferred"
 > workOnAColumn cts = do
->   return $ foldl1 anlzr cts
+>   r' <- analyzeRow cts
+>   foldM anlzr Unknown r'
 >   where
->     anlzr :: CellType -> CellType -> Celltype
+>     anlzr :: CellType -> CellType -> Either String CellType
+>     anlzr a b =
+>       let shouldBeNull = isNullable a || isNullable b
+>       in return $ applyNullIfNeeded shouldBeNull $ if b > a then b else a
+
+> isNullable (Nullable _) = True
+> isNullable _ = False
+
+> applyNullIfNeeded True r@Nullable{} = r
+> applyNullIfNeeded True r = Nullable r
+> applyNullIfNeeded False r = r
 
 > analyzeRow :: [String] -> Either String [CellType]
-> analyzeRow = map analyzeCell
+> analyzeRow = mapM analyzeCell
 
 > analyzeCell :: String -> Either String CellType
 > analyzeCell s
 >  | null s = Right $ Nullable Unknown
+>  | b <- map toLower s
+>  , b `elem` ["false","true"] = Right $ CTBool
 >  | isInt s = do
 >      s' <- maybeToEither ("Can't read integer as Integer (??)") (readMaybe s :: Maybe Integer)
 >      intType s'
@@ -119,7 +134,8 @@
 >  case parse csvFile "(stdin)" (T.pack c) of
 >           Left e -> do putStrLn "Error parsing input:"
 >                        print e
->           Right r -> print (map (map analyzeCell) r)
+>           Right r -> do
+>             print (either (error . show) id $ analyzeFile r)
 
 > sepChar :: Char
 > sepChar = ','
