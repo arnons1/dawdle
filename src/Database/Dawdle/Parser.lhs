@@ -28,14 +28,23 @@
 > quotedCell :: SParser String
 > quotedCell = do
 >        sChar <- (oneOf quoteChars)
->        content <- many (quotedChar sChar)
+>        content <- many (fmap return nonEscape <|> escape) --(quotedChar sChar)
 >        _ <- char sChar <?> "quote at end of cell"
->        return content
+>        return $ concat content
 
-> quotedChar :: Char -> SParser Char
-> quotedChar csep =
->        noneOf [csep]
->    <|> try (string (replicate 2 csep) >> return csep)
+ quotedChar :: Char -> SParser Char
+ quotedChar csep =
+        noneOf [csep]
+    <|> try (string (replicate 2 csep) >> return csep)
+
+> nonEscape :: SParser Char
+> nonEscape = noneOf "\\\"\0\n\r\v\t\b\f"
+
+> escape :: SParser String
+> escape = do
+>   d <- char '\\'
+>   c <- oneOf "\\\"0nrvtbf"
+>   return [d,c]
 
 > eol :: SParser String
 > eol =   try (string newLines)

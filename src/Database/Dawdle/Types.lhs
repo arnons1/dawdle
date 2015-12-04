@@ -7,7 +7,10 @@
 >        ,applyNullIfNeeded
 >        ,getDateFormatFromCT
 >        ,removeNull
->        ,composeNull)
+>        ,composeNull
+>        ,composeMaxTypesWithNulls
+>        ,isDateOrUnknown
+>        ,isDateTimeOrUnknown)
 > where
 > import Data.Data
 > import Text.Parsec

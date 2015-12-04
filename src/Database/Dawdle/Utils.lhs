@@ -4,10 +4,11 @@
 >  ,isInt
 >  ,maybeToEither
 >  ,allTheSame
->  --,ppShow
+>  ,normalizeNames
 >   )
 > where
 > import Data.Char
+> import Data.List
 
 > getFstIfJust :: (a, Maybe b) -> Maybe a
 > getFstIfJust (a,Just _) = Just a
@@ -25,3 +26,8 @@
 
 > allTheSame :: (Eq a) => [a] -> Bool
 > allTheSame xs = and $ map (== head xs) (tail xs)
+
+> normalizeNames :: [String] -> [String]
+> normalizeNames = map normalize
+>  where
+>    normalize = map toLower . (filter (\x -> x=='_' || isAlphaNum x)) . intercalate "_" . words

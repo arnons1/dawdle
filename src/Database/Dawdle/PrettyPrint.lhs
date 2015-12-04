@@ -7,13 +7,14 @@
 > import Database.Dawdle.Types
 > import Text.PrettyPrint
 
-> pretty :: String -> [CellType] -> String
-> pretty fn = render . (ddl fn)
+> pretty :: String -> [String] -> [CellType] -> String
+> pretty fn colns = render . (ddl fn colns)
 
-> ddl :: String -> [CellType] -> Doc
-> ddl fn cts = text "create table" <+> text fn <+> body
+> ddl :: String -> [String] -> [CellType] -> Doc
+> ddl fn colns cts = text "create table" <+> text fn <+> body
 >   where
->     body = parens $ nest 3 $ vcat $ (punctuate comma (map (prettyTypes True) cts))
+>     body = parens $ nest 3 $ vcat $ (punctuate comma clnms)
+>     clnms = zipWith (\a b -> text a <+> b) colns $ map (prettyTypes True) cts
 
 > prettyTypes :: Bool -> CellType -> Doc
 > prettyTypes isNullPass = \case
