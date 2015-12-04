@@ -5,12 +5,13 @@ Generates an executable called `dawdle` once installed.
 
 ## Usage examples
 `$ dawdle --input="example_with_comma.csv" --with-header -s ","`
-This means analyze the file `example.csv`, assume the first line is the header and use a comma as a separator.
+This means analyze the file `example_with_comma.csv`, assume the first line is the header and use a comma as a separator.
 The example output is
-    create table matomy_sites (id int not null,
-                               name varchar(65) not null,
-                               created_at datetime not null,
-                               updated_at datetime not null)
+
+    create table example_with_comma (id int not null,
+                                     name varchar(65) not null,
+                                     created_at datetime not null,
+                                     updated_at datetime not null)
 
 To see all command line flags, run `$ dawdle --help`.
 
