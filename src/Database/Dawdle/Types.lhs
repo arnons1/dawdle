@@ -5,7 +5,9 @@
 >        ,CellType(..)
 >        ,isNullable
 >        ,applyNullIfNeeded
->        ,getDateFormatFromCT)
+>        ,getDateFormatFromCT
+>        ,removeNull
+>        ,composeNull)
 > where
 > import Data.Data
 > import Text.Parsec
@@ -28,3 +30,26 @@
 > getDateFormatFromCT (CTDateTime s) = Just s
 > getDateFormatFromCT (CTDate s) = Just s
 > getDateFormatFromCT _ = Nothing
+
+> removeNull :: CellType -> CellType
+> removeNull (Nullable x) = x
+> removeNull x = x
+
+> composeNull :: CellType -> CellType -> CellType
+> composeNull _ r@Nullable{} = r
+> composeNull Nullable{} r = Nullable r
+> composeNull _ r = r
+
+> composeMaxTypesWithNulls :: CellType -> CellType -> CellType
+> composeMaxTypesWithNulls mp nt =
+>   composeNull mp (maximum $ map removeNull [mp,nt])
+
+> isDateOrUnknown :: CellType -> Bool
+> isDateOrUnknown CTDate{} = True
+> isDateOrUnknown Unknown = True
+> isDateOrUnknown _ = False
+
+> isDateTimeOrUnknown :: CellType -> Bool
+> isDateTimeOrUnknown CTDateTime{} = True
+> isDateTimeOrUnknown Unknown = True
+> isDateTimeOrUnknown _ = False

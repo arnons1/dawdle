@@ -4,11 +4,10 @@
 >  ,isInt
 >  ,maybeToEither
 >  ,allTheSame
->  ,ppShow
+>  --,ppShow
 >   )
 > where
 > import Data.Char
-> import Text.Show.Pretty
 
 > getFstIfJust :: (a, Maybe b) -> Maybe a
 > getFstIfJust (a,Just _) = Just a
@@ -19,7 +18,7 @@
 
 > isInt :: String -> Bool
 > isInt = all (\x -> isNumber x || x =='-')
->
+
 > maybeToEither :: String -> Maybe a -> Either String a
 > maybeToEither _ (Just x) = Right x
 > maybeToEither s Nothing = Left s

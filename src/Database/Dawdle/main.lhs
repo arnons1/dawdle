@@ -1,6 +1,6 @@
 > {-# LANGUAGE ExplicitForAll,TupleSections,
 >              NoMonomorphismRestriction,OverloadedStrings,
->              FlexibleContexts, RankNTypes #-}
+>              FlexibleContexts, RankNTypes, ViewPatterns #-}
 
 > import Database.Dawdle.Types
 > import Database.Dawdle.PrettyPrint
@@ -20,68 +20,65 @@
 > import Data.Int
 > import Data.List
 > import Data.Time.Format
-> import Data.Time.Clock
+> import Data.Time.Calendar
 > import Debug.Trace
 > import System.Environment
-> import qualified Data.Vector as V
+> import System.FilePath
 
 > analyzeFile :: [[String]] -> Either String [CellType]
 > analyzeFile mtrx = do
 >   let cols = transpose mtrx
 >   -- sanity on structure
->   unless (allTheSame (map length cols)) $ Left $ "Invalid CSV: Some rows have a different number of columns."
+>   unless (allTheSame (map length cols)) $ Left $ "Invalid CSV: Some rows have a different number of columns.\nPerhaps your separator is wrong?"
 >   mapM workOnAColumn cols
 
 > workOnAColumn :: [String] -> Either String CellType
 > workOnAColumn [] = Left "Empty column, no cell types inferred"
 > workOnAColumn cts = do
->   r' <- analyzeRow cts
->   foldM anlzr Unknown r'
->   where
->     anlzr :: CellType -> CellType -> Either String CellType
->     anlzr a b = do
->       let shouldBeNull = isNullable a || isNullable b
->       -- Check if previous format was the same format (for dates)
->       case (getDateFormatFromCT a,getDateFormatFromCT b) of
->         (Just d1, Just d2) | d1==d2 -> return $ applyNullIfNeeded shouldBeNull $ if b > a then b else a
->         _ -> return $ applyNullIfNeeded shouldBeNull $ maximum [b,a]
+>   foldM analyzeCell Unknown cts
 
-> analyzeRow :: [String] -> Either String [CellType]
-> analyzeRow = mapM analyzeCell
-
-> analyzeCell :: String -> Either String CellType
-> analyzeCell s
->  | null s || isNullText s = Right $ Nullable Unknown
+> analyzeCell :: CellType -> String -> Either String CellType
+> analyzeCell mp s
+>  | null s || isNullText s = Right $ composeMaxTypesWithNulls mp $ Nullable Unknown
 >  | b <- map toLower s
->  , b `elem` ["false","true"] = Right $ CTBool
->  | ((fFmt,_):_) <- catMaybes
->       [(fmt,) <$> ptm fmt s | fmt <- (iso8601DateFormat Nothing) : 
->                                      (if length s == 8 then ["%Y%m%d"] else [])] = 
->        return $ CTDate fFmt
->                           
->  | ((fFmt,_):_) <- catMaybes
->       [(fmt,) <$> ptm fmt s | fmt <- [iso8601DateFormat $ Just "%H:%M:%S"
->                                      ,"%Y-%m-%d %H:%M:%S.%Q"
+>  , b `elem` ["false","true"]
+>  , (removeNull mp) `elem` [CTBool,Unknown] =
+>      Right $ composeMaxTypesWithNulls mp CTBool
+>  | (isDateOrUnknown $ removeNull mp)
+>  , Just fFmt <- msum
+>       [ ptm fmt s | fmt <- (iso8601DateFormat Nothing) : 
+>                            (if length s == 8 then ["%Y%m%d"] else [])] = 
+>      case getDateFormatFromCT mp of
+>        Just oFmt |
+>          oFmt /= fFmt -> return $ composeMaxTypesWithNulls mp $ CTChar (length s)
+>        _ -> return $ composeMaxTypesWithNulls mp $ CTDate fFmt
+>  | (isDateTimeOrUnknown $ removeNull mp)
+>  , Just fFmt <- msum
+>       [ ptm fmt s | fmt <- [iso8601DateFormat $ Just "%H:%M:%S"
+>                                      ,"%Y-%m-%d %H:%M:%S%Q"
 >                                      ,"%Y-%m-%d %H:%M:%S"
 >                                      ,rfc822DateFormat]] =
->        return $ CTDateTime fFmt
->  | otherwise = numTypeOrString s
+>      case getDateFormatFromCT mp of
+>        Just oFmt |
+>          oFmt /= fFmt -> return $ composeMaxTypesWithNulls mp $ CTChar (length s)
+>        _ -> return $ composeMaxTypesWithNulls mp $ CTDateTime fFmt
+>  | isInt s
+>  , (removeNull mp) < CTDateTime "" = do
+>       s' <- maybeToEither ("Can't read integer as Integer (??)") (readMaybe s :: Maybe Integer)
+>       composeMaxTypesWithNulls mp <$> intType' s'
+>  | (not . isInt) s && isCTNumber s
+>  , (removeNull mp) < CTChar 1 = do
+>      s' <- maybeToEither ("Can't read float type as Double (??)") (readMaybe s :: Maybe Double)
+>      composeMaxTypesWithNulls mp <$> floatType s'
+>   | otherwise = Right $ composeMaxTypesWithNulls mp $ CTChar (length s)
+
 
 > isNullText :: String -> Bool
 > isNullText s = (map toLower s == "null") || (s == "\\N")
 
-> ptm :: String -> String -> Maybe UTCTime
-> ptm = parseTimeM True defaultTimeLocale
+> ptm :: String -> String -> Maybe String
+> ptm tf ts = maybe Nothing (const $ Just tf) ((parseTimeM True defaultTimeLocale tf ts) :: Maybe Day)
 
-> numTypeOrString :: String -> Either String CellType
-> numTypeOrString s
->   | isInt s = do
->       s' <- maybeToEither ("Can't read integer as Integer (??)") (readMaybe s :: Maybe Integer)
->       intType' s'
->   | (not . isInt) s && isCTNumber s = do
->      s' <- maybeToEither ("Can't read float type as Double (??)") (readMaybe s :: Maybe Double)
->      floatType s'
->   | otherwise = Right $ CTChar (length s)
 
 > intType' :: Integer -> Either String CellType
 > intType' x
@@ -92,27 +89,29 @@
 >   | otherwise = Left "Error: Integer out of bounds"
 
 > floatType :: Double -> Either String CellType
-> floatType x = do
+> floatType x = 
 >   let x' = realToFrac x :: Float
->   if (show x') /= (show x)
->   then Right CTDouble
->   else Right CTFloat
+>   in if (show x') /= (show x)
+>      then Right CTDouble
+>      else Right CTFloat
 
 > main :: IO ()
 > main = do
 >  a <- getArgs
 >  opts <- getOpts a
->  let source = fromMaybe "(stdin)" $ (optInput . fst) opts
+>  let source = fromMaybe "stdin" $ (optInput . fst) opts
+>      sepChar = (optSepChar . fst) opts
 >  c <- case (optInput . fst) opts of
 >         Just f -> LT.readFile f
 >         Nothing -> do
 >           LT.pack <$> getContents
->            
->  case parseCsv source c of
->           Left e -> do putStrLn "Error parsing input:"
->                        print e
->           Right r -> do
->             let rv = map (map V.fromList) r
->             putStrLn $ either error pretty $ analyzeFile rv
+>  case parseCsv sepChar source c of
+>    Left e -> do
+>      putStrLn "Error parsing input:"
+>      print e
+>    Right r -> do
+>      putStrLn $ either error (pretty $ genTbName source) $ analyzeFile r
+>  where
+>    genTbName = takeBaseName
 
 

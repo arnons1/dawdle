@@ -12,6 +12,7 @@
 >  , optInput       :: Maybe FilePath
 >  , optStopAfter   :: Integer
 >  , optWithHeader  :: Bool
+>  , optSepChar     :: Char
 >  } deriving Show
 
 > defaultOptions :: Options
@@ -20,6 +21,7 @@
 >  , optInput       = Nothing
 >  , optStopAfter   = 10000
 >  , optWithHeader  = False
+>  , optSepChar     = ','
 >  }
 >
 > options :: [OptDescr (Options -> Options)]
@@ -37,8 +39,14 @@
 >   ,Option ['h']     ["with-header"]
 >      (NoArg (\ opts -> opts { optWithHeader = True }))
 >      "is there a header line"
+>   ,Option ['s']     ["separator"]
+>      (ReqArg (\d opts -> opts { optSepChar = headErr' d }) "CHAR") "Separator char"
 >   ]
->
+
+> headErr' :: [a] -> a
+> headErr' (a:_) = a
+> headErr' _ = error "Head error in Options.lhs"
+
 > getOpts :: [String] -> IO (Options, [String])
 > getOpts argv =
 >   case getOpt Permute options argv of

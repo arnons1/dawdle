@@ -9,23 +9,21 @@
 > import Data.Text.Lazy (Text)
 > import Text.Parsec
 
-> parseCsv :: String -> Text -> Either ParseError [[String]]
-> parseCsv = parse csvFile
+> parseCsv :: Char -> String -> Text -> Either ParseError [[String]]
+> parseCsv sepChar = parse (csvFile sepChar)
 
-> sepChar :: Char
-> sepChar = ','
 > newLines :: String
 > newLines = "\n\r"
 > quoteChars :: String
 > quoteChars = "'\""
 
-> csvFile :: SParser [[String]]
-> csvFile = endBy line eol
+> csvFile :: Char -> SParser [[String]]
+> csvFile sepChar = endBy (line sepChar) eol
 
-> line :: SParser [String]
-> line = sepBy cell (char sepChar)
-> cell :: SParser String
-> cell = quotedCell <|> many (noneOf (sepChar:newLines))
+> line :: Char -> SParser [String]
+> line sepChar = sepBy (cell sepChar) (char sepChar)
+> cell :: Char -> SParser String
+> cell sepChar = quotedCell <|> many (noneOf (sepChar:newLines))
 
 > quotedCell :: SParser String
 > quotedCell = do
