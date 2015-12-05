@@ -18,7 +18,10 @@
 > import           Data.Time.Calendar
 > import           Text.Read (readMaybe)
 
-> analyzeFile :: Options -> [[String]] -> Either String [CellType]
+> -- | Analyze a file and return a list of types, or an error.
+> analyzeFile :: Options -- ^ Options from 'getOpts' (or 'defaultOptions') in "Database.Dawdle.Options"
+>             -> [[String]] -- ^ Table containing parsed CSV text, one element per cell
+>             -> Either String [CellType] -- ^ Returned type is either error message or list of types, each item representing one column
 > analyzeFile o mtrx = do
 >   let cols = transpose mtrx
 >   -- sanity on structure
@@ -33,12 +36,12 @@
 
 > analyzeCell :: CellType -> String -> Either String CellType
 > analyzeCell mp s
->  | null s || isNullText s = Right $ composeMaxTypesWithNulls mp $ Nullable Unknown
+>  | null s || isNullText s = Right $ addNullable $ composeMaxTypesWithNulls mp Unknown
 >  | b <- map toLower s
 >  , b `elem` ["false","true"]
->  , removeNull mp `elem` [CTBool,Unknown] =
+>  , removeNullable mp `elem` [CTBool,Unknown] =
 >      Right $ composeMaxTypesWithNulls mp CTBool
->  | isDateOrUnknown $ removeNull mp
+>  | isDateOrUnknown $ removeNullable mp
 >  , Just fFmt <- msum
 >       [ ptm fmt s | fmt <- iso8601DateFormat Nothing : 
 >                            ["%Y%m%d" | length s == 8] ] = 
@@ -46,7 +49,7 @@
 >        Just oFmt |
 >          oFmt /= fFmt -> return $ composeMaxTypesWithNulls mp $ CTChar (length s)
 >        _ -> return $ composeMaxTypesWithNulls mp $ CTDate fFmt
->  | isDateTimeOrUnknown $ removeNull mp
+>  | isDateTimeOrUnknown $ removeNullable mp
 >  , Just fFmt <- msum
 >       [ ptm fmt s | fmt <- [iso8601DateFormat $ Just "%H:%M:%S"
 >                                      ,"%Y-%m-%d %H:%M:%S%Q"
@@ -57,11 +60,11 @@
 >          oFmt /= fFmt -> return $ composeMaxTypesWithNulls mp $ CTChar (length s)
 >        _ -> return $ composeMaxTypesWithNulls mp $ CTDateTime fFmt
 >  | isInt s
->  , removeNull mp < CTDateTime ""
+>  , removeNullable mp < CTDateTime ""
 >  , Right s' <- maybeToEither "Can't read integer as Integer (??)" (readMaybe s :: Maybe Integer) =
 >       composeMaxTypesWithNulls mp <$> intType' s'
 >  | (not . isInt) s && isCTNumber s
->  , removeNull mp < CTChar 1
+>  , removeNullable mp < CTChar 1
 >  , Right s' <- maybeToEither "Can't read float type as Double (??)" (readMaybe s :: Maybe Double) =
 >      composeMaxTypesWithNulls mp <$> floatType s'
 >   | otherwise = Right $ composeMaxTypesWithNulls mp $ CTChar (length s)

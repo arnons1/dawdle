@@ -8,16 +8,32 @@
 >
 > import           System.Console.GetOpt
 > import           Text.Read ( readMaybe )
->
+
+> -- | Options structure for passing to the main module's 'analyzeFile'
 > data Options = Options
->  { optVerbose     :: Bool
->  , optInput       :: Maybe FilePath
->  , optStopAfter   :: Maybe Int
->  , optWithHeader  :: Bool
->  , optSepChar     :: Char
->  , optVerifyIntegrity :: Bool
+>  { optVerbose     :: Bool -- ^ Verbose mode
+>  , optInput       :: Maybe FilePath -- ^ stdin (Nothing) or file to read (Just FilePath)
+>  , optStopAfter   :: Maybe Int -- ^ Threshold for stopping (Just Int)
+>                                --   or consume entire file (Nothing)
+>  , optWithHeader  :: Bool -- ^ Is the first line a header? (Boolean)
+>  , optSepChar     :: Char -- ^ Separator character for CSV (Default ',')
+>  , optVerifyIntegrity :: Bool -- ^ Verify integrity of CSV file first? (Default True)
 >  } deriving Show
 
+> -- | Default set of options:
+> --
+> --   * Verbosity: False
+> --
+> --   * Input: Nothing (stdin)
+> --
+> --   * Stop after threshold: Just 10000
+> --
+> --   * With header: False
+> --
+> --   * Separator char: ,
+> --
+> --   * Verify integrity: True
+> --
 > defaultOptions :: Options
 > defaultOptions    = Options
 >  { optVerbose     = False
@@ -54,6 +70,8 @@
 > headErr' (a:_) = a
 > headErr' _ = error "Head error in Options.lhs"
 
+> -- | getOpts constructs a set of flags based on the user's input
+> --   and the default options set in the 'defaultOptions' structure
 > getOpts :: [String] -> IO (Options, [String])
 > getOpts argv =
 >   case getOpt Permute options argv of

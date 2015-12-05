@@ -10,7 +10,12 @@
 > import Data.Text.Lazy (Text)
 > import Text.Parsec
 
-> parseCsv :: Char -> String -> Text -> Either ParseError [[String]]
+> -- | Parses a CSV file and returns a 2D list of parsed strings
+> parseCsv :: Char -- ^ Separator character for CSV
+>          -> String -- ^ Source of the text (stdin/file name)
+>          -> Text -- ^ "Data.Text.Lazy"'s 'Text' of the source
+>          -> Either ParseError [[String]] -- ^ Either "Text.Parsec"'s 'ParseError'
+>                                          --   or a 2D list of parsed strings
 > parseCsv sepChar = parse (csvFile sepChar)
 
 > newLines :: String
