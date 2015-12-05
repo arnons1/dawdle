@@ -57,12 +57,12 @@
 >          oFmt /= fFmt -> return $ composeMaxTypesWithNulls mp $ CTChar (length s)
 >        _ -> return $ composeMaxTypesWithNulls mp $ CTDateTime fFmt
 >  | isInt s
->  , removeNull mp < CTDateTime "" = do
->       s' <- maybeToEither "Can't read integer as Integer (??)" (readMaybe s :: Maybe Integer)
+>  , removeNull mp < CTDateTime ""
+>  , Right s' <- maybeToEither "Can't read integer as Integer (??)" (readMaybe s :: Maybe Integer) =
 >       composeMaxTypesWithNulls mp <$> intType' s'
 >  | (not . isInt) s && isCTNumber s
->  , removeNull mp < CTChar 1 = do
->      s' <- maybeToEither "Can't read float type as Double (??)" (readMaybe s :: Maybe Double)
+>  , removeNull mp < CTChar 1
+>  , Right s' <- maybeToEither "Can't read float type as Double (??)" (readMaybe s :: Maybe Double) =
 >      composeMaxTypesWithNulls mp <$> floatType s'
 >   | otherwise = Right $ composeMaxTypesWithNulls mp $ CTChar (length s)
 > {-# INLINE analyzeCell #-}

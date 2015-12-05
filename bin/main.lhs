@@ -15,9 +15,7 @@
 > import           Data.Maybe
 > import           System.Environment
 > import           System.FilePath
-> import           System.IO ( stdin )
-
-> import Debug.Trace
+> import           System.IO ( hPutStrLn, stdin, stderr )
 
 > main :: IO ()
 > main = do
@@ -31,9 +29,11 @@
 >  c <- case inputMode of
 >         Just f -> LT.readFile f
 >         Nothing -> LT.hGetContents stdin
->  let c' = case stopAfter of
->        Nothing -> trace "No limit" c
->        Just x -> LT.unlines $ take x $ LT.lines c
+>  c' <- case stopAfter of
+>        Nothing ->
+>          hPutStrLn stderr "Warning: No limit was set. Entire file will be read" >> 
+>          return c
+>        Just x -> return $ LT.unlines $ take x $ LT.lines c
 >  case parseCsv sepChar source c' of
 >    Left e -> do
 >      putStrLn "Error parsing input:"
