@@ -1,3 +1,4 @@
+
 > {-# LANGUAGE ExplicitForAll,TupleSections,
 >              NoMonomorphismRestriction,OverloadedStrings,
 >              FlexibleContexts, RankNTypes #-}
@@ -24,13 +25,15 @@
 > line sepChar = sepBy (cell sepChar) (char sepChar)
 > cell :: Char -> SParser String
 > cell sepChar = quotedCell <|> many (noneOf (sepChar:newLines))
+> {-# INLINE cell #-}
 
 > quotedCell :: SParser String
 > quotedCell = do
->        sChar <- (oneOf quoteChars)
+>        sChar <- oneOf quoteChars
 >        content <- many (fmap return nonEscape <|> escape) --(quotedChar sChar)
 >        _ <- char sChar <?> "quote at end of cell"
 >        return $ concat content
+> {-# INLINE quotedCell #-}
 
  quotedChar :: Char -> SParser Char
  quotedChar csep =
@@ -39,12 +42,14 @@
 
 > nonEscape :: SParser Char
 > nonEscape = noneOf "\\\"\0\n\r\v\t\b\f"
+> {-# INLINE nonEscape #-}
 
 > escape :: SParser String
 > escape = do
 >   d <- char '\\'
 >   c <- oneOf "\\\"0nrvtbf"
 >   return [d,c]
+> {-# INLINE escape #-}
 
 > eol :: SParser String
 > eol =   try (string newLines)

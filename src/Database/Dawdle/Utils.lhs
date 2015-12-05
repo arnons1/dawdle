@@ -1,3 +1,4 @@
+
 > module Database.Dawdle.Utils
 >  (getFstIfJust
 >  ,isCTNumber
@@ -25,9 +26,9 @@
 > maybeToEither s Nothing = Left s
 
 > allTheSame :: (Eq a) => [a] -> Bool
-> allTheSame xs = and $ map (== head xs) (tail xs)
+> allTheSame xs = all (== head xs) (tail xs)
 
 > normalizeNames :: [String] -> [String]
 > normalizeNames = map normalize
 >  where
->    normalize = map toLower . (filter (\x -> x=='_' || isAlphaNum x)) . intercalate "_" . words
+>    normalize = map toLower . filter (\x -> x=='_' || isAlphaNum x) . intercalate "_" . words

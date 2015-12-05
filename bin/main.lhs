@@ -1,49 +1,54 @@
+
 > {-# LANGUAGE ExplicitForAll,TupleSections,
 >              NoMonomorphismRestriction,OverloadedStrings,
->              FlexibleContexts, RankNTypes, ViewPatterns #-}
+>              FlexibleContexts, RankNTypes #-}
 
-> import Database.Dawdle.Parser
-> import Database.Dawdle.Dawdle
-> import Database.Dawdle.Options
-> import Database.Dawdle.Utils
-> import Database.Dawdle.PrettyPrint
+> import           Database.Dawdle.Parser
+> import           Database.Dawdle.Dawdle
+> import           Database.Dawdle.Options
+> import           Database.Dawdle.Utils
+> import           Database.Dawdle.PrettyPrint
 
 > import qualified Data.Text.Lazy.IO as LT
-> import qualified Data.Text.Lazy as LT
-> import Text.Parsec.Text ()
+> import qualified Data.Text.Lazy    as LT
  
-> import Data.Maybe
-> import System.Environment
-> import System.FilePath
+> import           Data.Maybe
+> import           System.Environment
+> import           System.FilePath
+> import           System.IO ( stdin )
 
+> import Debug.Trace
 
 > main :: IO ()
 > main = do
 >  a <- getArgs
->  opts <- getOpts a
->  let source = fromMaybe "stdin" $ (optInput . fst) opts
->      sepChar = (optSepChar . fst) opts
->      inputMode = (optInput . fst) opts
->      withHeader = (optWithHeader . fst) opts
+>  opts <- fst <$> getOpts a
+>  let source = fromMaybe "stdin" $ optInput opts
+>      sepChar = optSepChar opts
+>      inputMode = optInput opts
+>      withHeader = optWithHeader opts
+>      stopAfter = optStopAfter opts
 >  c <- case inputMode of
 >         Just f -> LT.readFile f
->         Nothing -> do
->           LT.pack <$> getContents
->  case parseCsv sepChar source c of
+>         Nothing -> LT.hGetContents stdin
+>  let c' = case stopAfter of
+>        Nothing -> trace "No limit" c
+>        Just x -> LT.unlines $ take x $ LT.lines c
+>  case parseCsv sepChar source c' of
 >    Left e -> do
 >      putStrLn "Error parsing input:"
 >      print e
 >    Right [] -> error "Empty parsing result. Empty CSV?"
->    Right res@(x:xs) -> do
+>    Right res@(x:xs) ->
 >      if withHeader
 >      then if null xs
 >        then error "No content after header. Empty CSV!"
->        else -- Parser rest with pretty columns
+>        else -- Parse rest with pretty columns
 >             let x' = normalizeNames x
->             in putStrLn $ either error (pretty (genTbName source) x') $ analyzeFile xs
->      else -- No header
+>             in putStrLn $ either error (pretty (genTbName source) x') $ analyzeFile opts xs
+>      else -- No header, parse entire file
 >        let colNms = take (length x) [ "col_"++show i | i <- [1..] :: [Int] ]
->        in putStrLn $ either error (pretty (genTbName source) colNms) $ analyzeFile res
+>        in putStrLn $ either error (pretty (genTbName source) colNms) $ analyzeFile opts res
  
 >  where
 >    genTbName = takeBaseName

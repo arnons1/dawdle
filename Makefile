@@ -10,6 +10,6 @@ build/dawdle : src/Database/Dawdle/*.lhs
 
 BUILD = build
 
-HC_MAKE_OPTS = --make -funfolding-use-threshold=16 -O2 -optc-O3 -fasm -split-objs -optc "-pipe" -v0 -Wall -rtsopts -threaded -stubdir $(BUILD) -fno-spec-constr -fno-warn-overlapping-patterns
+HC_MAKE_OPTS = --make -funfolding-use-threshold=16 -O3 -optc-O3 -fasm -split-objs -optc "-pipe" -v0 -Wall -rtsopts -threaded -stubdir $(BUILD) -fno-spec-constr -fno-warn-overlapping-patterns
 HC = ghc
 HL = $(HC)
